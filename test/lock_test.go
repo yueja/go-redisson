@@ -2,7 +2,7 @@ package test
 
 import (
 	"fmt"
-	"study/redis/redislock/redislock"
+	"study/redis/redisson-go/lock"
 	"testing"
 	"time"
 )
@@ -10,10 +10,10 @@ import (
 // TestDemo1 加锁简单测试
 func TestDemo1(t *testing.T) {
 	var (
-		locker *redislock.Locker
+		locker *lock.Locker
 		err    error
 	)
-	if locker, err = redislock.Lock("TestDemo1_", &redislock.Options{RetryCount: 5, LockTimeout: 20 * time.Second}); err != nil {
+	if locker, err = lock.Lock("TestDemo1_", &lock.Options{RetryCount: 5, LockTimeout: 20 * time.Second}); err != nil {
 		return
 	}
 	defer locker.Unlock()
@@ -27,8 +27,8 @@ func TestDemo2(t *testing.T) {
 	)
 	for i := 0; i < 5; i++ {
 		go func(index int) {
-			locker := new(redislock.Locker)
-			if locker, err = redislock.Lock("TestDemo1_", &redislock.Options{
+			locker := new(lock.Locker)
+			if locker, err = lock.Lock("TestDemo1_", &lock.Options{
 				RetryCount:  50,
 				RetryDelay:  200 * time.Millisecond,
 				LockTimeout: 5 * time.Second,
@@ -46,10 +46,10 @@ func TestDemo2(t *testing.T) {
 // TestDemo10 看门狗简单测试
 func TestDemo10(t *testing.T) {
 	var (
-		locker *redislock.Locker
+		locker *lock.Locker
 		err    error
 	)
-	if locker, err = redislock.Lock("TestDemo1_", &redislock.Options{RetryCount: 5, LockTimeout: 20 * time.Second}); err != nil {
+	if locker, err = lock.Lock("TestDemo1_", &lock.Options{RetryCount: 5, LockTimeout: 20 * time.Second}); err != nil {
 		return
 	}
 	time.Sleep(1 * time.Minute)
@@ -61,11 +61,11 @@ func TestDemo10(t *testing.T) {
 // TestDemo3 锁重入(2次重入，即加锁3次，2次解锁)
 func TestDemo3(t *testing.T) {
 	var (
-		locker *redislock.Locker
+		locker *lock.Locker
 		ok     bool
 		err    error
 	)
-	if locker, err = redislock.Lock("TestDemo1_", &redislock.Options{RetryCount: 5, LockTimeout: 10 * time.Second}); err != nil {
+	if locker, err = lock.Lock("TestDemo1_", &lock.Options{RetryCount: 5, LockTimeout: 10 * time.Second}); err != nil {
 		panic(err)
 		return
 	}
@@ -106,11 +106,11 @@ func TestDemo3(t *testing.T) {
 // TestDemo3 锁重入(2次重入，即加锁3次，3次解锁)
 func TestDemo4(t *testing.T) {
 	var (
-		locker *redislock.Locker
+		locker *lock.Locker
 		ok     bool
 		err    error
 	)
-	if locker, err = redislock.Lock("TestDemo1_", &redislock.Options{RetryCount: 5, LockTimeout: 10 * time.Second}); err != nil {
+	if locker, err = lock.Lock("TestDemo1_", &lock.Options{RetryCount: 5, LockTimeout: 10 * time.Second}); err != nil {
 		panic(err)
 		return
 	}
