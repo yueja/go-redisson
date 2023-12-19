@@ -2,7 +2,7 @@ package test
 
 import (
 	"fmt"
-	"study/redis/redisson-go/lock"
+	"redisson-go/lock"
 	"testing"
 	"time"
 )
