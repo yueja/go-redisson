@@ -44,7 +44,7 @@ var luaRelease = redis.NewScript(
 )
 
 var luaDog = redis.NewScript(
-	"if (redis.call('exists', KEYS[1]) == 1) then " +
+	"if (redis.call('hexists', KEYS[1], ARGV[2]) == 1) then " +
 		"redis.call('pexpire', KEYS[1], ARGV[1]); " +
 		"return 1; " +
 		"else return 0; " +
@@ -53,15 +53,13 @@ var luaDog = redis.NewScript(
 
 var emptyCtx = context.Background()
 
-// ErrLockNotObtained may be returned by Obtain() and Run()
-// if a lock could not be obtained.
 var (
 	ErrLockUnlockFailed     = errors.New("lock unlock failed")
 	ErrLockNotObtained      = errors.New("lock not obtained")
 	ErrLockDurationExceeded = errors.New("lock duration exceeded")
 )
 
-// RedisClient is a minimal client interface.
+// RedisClient 一个最小的客户端接口
 type RedisClient interface {
 	SetNX(key string, value interface{}, expiration time.Duration) *redis.BoolCmd
 	Eval(script string, keys []string, args ...interface{}) *redis.Cmd
@@ -70,7 +68,7 @@ type RedisClient interface {
 	ScriptLoad(script string) *redis.StringCmd
 }
 
-// Locker allows (repeated) distributed locking.
+// Locker 允许（重入）分布式锁定
 type Locker struct {
 	client RedisClient
 	key    string
@@ -81,8 +79,7 @@ type Locker struct {
 	mutex    sync.Mutex
 }
 
-// Run runs a callback handler with a Redis lock. It may return ErrLockNotObtained
-// if a lock was not successfully acquired.
+// Run 运行一个带有Redis锁的回调处理程序。如果未成功获取锁，它可能返回ErrLockNotObserved
 func Run(client RedisClient, key string, opts *Options, handler func()) error {
 	locker, err := Obtain(client, key, opts)
 	if err != nil {
@@ -165,16 +162,17 @@ func (l *Locker) dog(ctx context.Context) {
 		case <-l.dogTimer.C:
 			//fmt.Println("打印看门狗触发时间：", time.Now().Unix())
 			ttl := strconv.FormatInt(int64(l.opts.LockTimeout/time.Millisecond), 10)
-			data, err := luaDog.Run(l.client, []string{l.key}, ttl).Result()
+			data, err := luaDog.Run(l.client, []string{l.key}, ttl, l.token).Result()
 			if err != nil {
 				return
 			}
-			log.Printf("打印看门狗触发时间%d：%d,count:%d,data:%d，token:%s", l.opts.Index, time.Now().Unix(), count, data, l.token)
 			if data == int64(1) && count < 10 {
 				//	锁续命重置了,重新启动新的定时任务
 				count++
 				l.dogTimer = time.NewTimer((l.opts.LockTimeout / 3) * 2)
+				log.Printf("**********************看门狗锁续命触发时间**********************index:%d，时间点：%d，count:%d，data:%d，token:%s", l.opts.Index, time.Now().Unix(), count, data, l.token)
 			} else {
+				log.Printf("**********************看门狗停止工作时间**********************index:%d，时间点：%d，count:%d，data:%d，token:%s", l.opts.Index, time.Now().Unix(), count, data, l.token)
 				l.dogTimer.Stop()
 				break
 			}
@@ -191,6 +189,7 @@ func (l *Locker) Unlock() error {
 	return err
 }
 
+// 带重试机制的加锁
 func (l *Locker) create(ctx context.Context) (bool, error) {
 	l.reset()
 
@@ -223,6 +222,7 @@ func (l *Locker) create(ctx context.Context) (bool, error) {
 		}
 
 		if attempts--; attempts <= 0 {
+			log.Printf("+++++++++++重试次数已用完，未获取到锁+++++++++++index:%d，时间点：%d", l.opts.Index, time.Now().UnixMilli())
 			return false, nil
 		}
 
@@ -236,11 +236,12 @@ func (l *Locker) create(ctx context.Context) (bool, error) {
 		case <-ctx.Done():
 			return false, ctx.Err()
 		case <-retryDelay.C:
-			log.Printf("开始重试加锁%d：%d", l.opts.Index, time.Now().UnixMilli())
+			log.Printf("开始重试加锁，index：%d，时间点：%d", l.opts.Index, time.Now().UnixMilli())
 		}
 	}
 }
 
+// obtain 加锁/重入锁
 func (l *Locker) obtain(ctx context.Context, token string) (bool, error) {
 	ttl := strconv.FormatInt(int64(l.opts.LockTimeout/time.Millisecond), 10)
 	result, err := luaRefresh.Run(l.client, []string{l.key}, ttl, token).Result()
@@ -252,23 +253,27 @@ func (l *Locker) obtain(ctx context.Context, token string) (bool, error) {
 		return false, nil
 	}
 	go l.dog(ctx)
-	log.Printf("锁获取成功%d", l.opts.Index)
+	log.Printf("----------------------锁获取成功----------------------index:%d，时间点：%d", l.opts.Index, time.Now().UnixMilli())
 	return true, err
 }
 
+// release 锁的释放
 func (l *Locker) release() error {
 	ttl := strconv.FormatInt(int64(l.opts.LockTimeout/time.Millisecond), 10)
 	err := luaRelease.Run(l.client, []string{l.key}, ttl, l.token).Err()
 	if err != nil {
 		return err
 	}
+	log.Printf("===============锁释放成功===============index:%d，时间点：%d", l.opts.Index, time.Now().UnixMilli())
 	return err
 }
 
+// token重置
 func (l *Locker) reset() {
 	l.token = ""
 }
 
+// 获取随机token，模拟客户端id，为锁重入机制准备
 func randomToken() (string, error) {
 	buf := make([]byte, 16)
 	if _, err := rand.Read(buf); err != nil {

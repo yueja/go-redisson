@@ -14,9 +14,9 @@ type Options struct {
 	RetryDelay time.Duration
 
 	// TokenPrefix redis锁密钥的值将设置TokenPrefix+randomToken
-	// 如果我们将令牌前缀设置为hostname+pid，我们就可以知道谁得到了locker
 	TokenPrefix string
 
+	// 用于测试时观察日志方便
 	Index int
 }
 
