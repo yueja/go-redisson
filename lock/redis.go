@@ -1,4 +1,4 @@
-package redislock
+package lock
 
 import (
 	"errors"
@@ -53,8 +53,8 @@ func init() {
 /**
  * redis 分布式锁
  * @param  key  {string} 			 初始化锁的互斥标示
- * @param  opts {*redislock.Options} 初始化锁的配置信息（详见该机构提的配置注释）
- * @return *    {*redislock.Options} 锁的实例（业务逻辑完成之后需要解锁）
+ * @param  opts {*lock.Options} 初始化锁的配置信息（详见该机构提的配置注释）
+ * @return *    {*lock.Options} 锁的实例（业务逻辑完成之后需要解锁）
  * @return *    {error} 			 异常
  */
 func Lock(key string, opts *Options, dbIndex ...int) (*Locker, error) {
@@ -71,7 +71,7 @@ func Lock(key string, opts *Options, dbIndex ...int) (*Locker, error) {
 // UnLock
 /**
  * redis 分布式锁 -（解锁）
- * @param  locker {*redislock.Locker} 锁的实例（初始化的时候得到）
+ * @param  locker {*lock.Locker} 锁的实例（初始化的时候得到）
  */
 func UnLock(locker *Locker, dbIndex ...int) {
 	if locker == nil {
