@@ -1,4 +1,4 @@
-module redisson-go
+module yueja/go-redisson
 
 go 1.21.0
 

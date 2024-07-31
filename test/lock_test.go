@@ -2,9 +2,9 @@ package test
 
 import (
 	"fmt"
-	"redisson-go/lock"
 	"testing"
 	"time"
+	"yueja/go-redisson/lock"
 )
 
 // TestDemo1 加锁简单测试
